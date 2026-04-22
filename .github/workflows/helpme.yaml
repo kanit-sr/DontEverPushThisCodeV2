@@ -81,20 +81,10 @@ jobs:
             # continue-on-error: true (so pipeline keeps running BUT IT IS NOT A BEST PRACTICE — ideally we would fail here and fix SAST issues before moving on to later gates)
             # Q: where do findings show up? (NOT GitHub Security tab — why?)
             - name: SonarQube Scan
-              if: ${{ secrets.SONAR_TOKEN != '' && vars.SONAR_PROJECT_KEY != '' && vars.SONAR_ORGANIZATION != '' }}
               uses: SonarSource/sonarqube-scan-action@v7.1.0
               continue-on-error: true
-              with:
-                args: >
-                  -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
-                  -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
-                  -Dsonar.host.url=https://sonarcloud.io
               env:
                   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-            - name: Skip Sonar (missing config)
-              if: ${{ secrets.SONAR_TOKEN == '' || vars.SONAR_PROJECT_KEY == '' || vars.SONAR_ORGANIZATION == '' }}
-              run: echo "Missing Sonar config. Require SONAR_TOKEN secret and SONAR_PROJECT_KEY + SONAR_ORGANIZATION repository variables. Skipping Sonar scan."
 
     # GATE#1b: SAST via CodeQL (results in GitHub Security tab)
     codeql-scan:
@@ -213,10 +203,9 @@ jobs:
               uses: aquasecurity/trivy-action@master
               continue-on-error: true
               with:
-                scan-type: 'image'
                 image-ref: 'my-app:latest'
                 # TODO#17: output format for Security tab integration
-                format: 'sarif'
+                format: 'SARIF'
                 output: 'trivy-results.sarif'
                 # TODO#18: which severities should be reported? (UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL)
                 severity: 'HIGH,CRITICAL'
@@ -226,7 +215,7 @@ jobs:
             # TODO#20: upload Trivy SARIF to Security tab
             # Action: github/codeql-action/upload-sarif@v3, category: trivy
             - name: Upload Trivy SARIF to Security tab
-              if: ${{ always() && hashFiles('trivy-results.sarif') != '' }}
+              if: always() 
               uses: github/codeql-action/upload-sarif@v3
               continue-on-error: true
               with:
@@ -236,7 +225,7 @@ jobs:
             # Action: actions/upload-artifact@v4
             # name: trivy-sarif, path: trivy-results.sarif
             - name: Upload Trivy SARIF as artifact
-              if: ${{ always() && hashFiles('trivy-results.sarif') != '' }}
+              if: always() 
               uses: actions/upload-artifact@v4
               with:
                 name: trivy-sarif
