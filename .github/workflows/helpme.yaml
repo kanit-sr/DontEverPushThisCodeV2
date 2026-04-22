@@ -36,7 +36,8 @@ jobs:
 
               # TruffleHog scans code + commit history for verified secrets (live creds). It can be noisy, but is a great first line of defense.
             - name: Run TruffleHog
-              uses: trufflesecurity/trufflehog@main
+              # FIX: pinned from @main to a specific version to prevent supply-chain attacks
+              uses: trufflesecurity/trufflehog@v3.82.6
               continue-on-error: true # NOTE THAT THIS IS NOT A BEST PRACTICE — ideally we would fail here and fix secrets before moving on to later gates, but for demo purposes we want to see results from all scanners.
               with:
                 path: ./
@@ -59,6 +60,9 @@ jobs:
               continue-on-error: true
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                # FIX: GITLEAKS_LICENSE is required for private repos in some org contexts.
+                # Add this secret if scans silently degrade or produce no results.
+                # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
                 GITLEAKS_ENABLE_UPLOAD_ARTIFACT: true
                 GITLEAKS_ENABLE_SUMMARY: true
 
@@ -85,6 +89,13 @@ jobs:
               continue-on-error: true
               env:
                   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+              # FIX: requires sonar-project.properties at repo root, e.g.:
+              #   sonar.projectKey=your-project-key
+              #   sonar.sources=.
+              #   sonar.exclusions=node_modules/**
+              # Without this file the scan silently does nothing useful.
+              # SonarQube results appear in the SonarQube dashboard, NOT the GitHub Security tab,
+              # because it uses its own format rather than SARIF.
 
     # GATE#1b: SAST via CodeQL (results in GitHub Security tab)
     codeql-scan:
@@ -139,6 +150,15 @@ jobs:
               uses: actions/setup-node@v4
               with:
                   node-version: '20'
+
+            # FIX: cache the NVD database to avoid re-downloading on every run (~10-15 min penalty)
+            - name: Cache OWASP NVD database
+              uses: actions/cache@v4
+              with:
+                path: ~/.dependency-check/data
+                key: dependency-check-data-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+                restore-keys: |
+                  dependency-check-data-${{ runner.os }}-
 
             # TODO#11: install npm deps so Dependency-Check can resolve full tree
             #          Hint: `npm install` or `npm ci`
